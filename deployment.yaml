@@ -1,0 +1,88 @@
+version: '3'
+
+services:
+  authenticationDB:
+    image: mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
+      timeout: 10s
+      retries: 10
+    container_name: authenticationdb
+  authenticationdbmigration:
+    build:
+      context: ./
+      dockerfile: authenticationdbmigration.dockerfile
+    environment:
+      - DATABASE_URL=authenticationdb
+    depends_on:
+      authenticationDB:
+        condition: service_healthy
+  authentication:
+    build:
+      context: ./
+      dockerfile: authentication.dockerfile
+    environment:
+      - DATABASE_URL=authenticationdb
+    ports:
+      - 5000:5000
+    depends_on:
+      - authenticationdbmigration
+  adminer:
+    image: adminer
+    ports:
+      - 8080:8080
+  electionsDB:
+    image: mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
+      timeout: 10s
+      retries: 10
+    container_name: electionsdb
+    ports:
+      - 3307:3307
+  electionsdbmigration:
+    build:
+      context: ./
+      dockerfile: electionsdbmigration.dockerfile
+    environment:
+      - DATABASE_URL=electionsDB
+    depends_on:
+      electionsDB:
+        condition: service_healthy
+  admin:
+    build:
+      context: ./
+      dockerfile: admin.dockerfile
+    environment:
+      - DATABASE_URL=electionsDB
+    ports:
+      - 5001:5001
+    depends_on:
+      - electionsdbmigration
+  redis:
+    image: redis:latest
+    ports:
+      - 6379:6379
+  zvanicnik:
+    build:
+      context: ./
+      dockerfile: zvanicnik.dockerfile
+    environment:
+      - DATABASE_URL=electionsDB
+    ports:
+      - 5002:5002
+    depends_on:
+      - redis
+  daemon:
+    build:
+      context: ./
+      dockerfile: daemon.dockerfile
+    environment:
+      - DATABASE_URL=electionsDB
+    depends_on:
+      - electionsdbmigration
+      - redis
